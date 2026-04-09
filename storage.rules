@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isCoupleEditor() {
+      return isSignedIn() && request.auth.token.email in [
+        'ronaldx563@gmail.com',
+        'suellen@example.com'
+      ];
+    }
+
+    match /memories/{memoryId}/{fileName} {
+      allow read: if true;
+      allow write: if true; // Acesso público para testes
+    }
+  }
+}

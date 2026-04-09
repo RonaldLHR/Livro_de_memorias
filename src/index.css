@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-[#f8f4ee] text-stone-800 font-sans;
+  background-image:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.7), transparent 40%),
+    linear-gradient(to bottom, #f9f5ef, #f5efe7);
+}
+
+::selection {
+  background: rgba(215, 154, 149, 0.25);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
