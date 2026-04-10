@@ -125,6 +125,7 @@ export default function App() {
             createdAt?: { toDate?: () => Date } | string | null
             relatoDoDia?: string
             photos?: typeof mockMemories[number]['photos']
+            video?: { url: string } | null
             audio?: typeof mockMemories[number]['audio']
             author?: 'Ronald' | 'Suellen'
           }
@@ -141,6 +142,7 @@ export default function App() {
             createdAt,
             relatoDoDia: data.relatoDoDia ?? '',
             photos: data.photos ?? [],
+            video: data.video ?? undefined,
             audio: data.audio ?? undefined,
             author: data.author ?? 'Ronald',
           }

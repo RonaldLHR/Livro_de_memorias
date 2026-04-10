@@ -1,4 +1,4 @@
-import type { MemoryAudio, MemoryEntry, MemoryPhoto } from '../types'
+import type { MemoryAudio, MemoryEntry, MemoryPhoto, MemoryVideo } from '../types'
 import { normalizeImageFiles } from './imageNormalization'
 
 export type MemoryFormInput = {
@@ -7,6 +7,7 @@ export type MemoryFormInput = {
   relatoDoDia: string
   author: 'Ronald' | 'Suellen'
   photos: File[]
+  videoFile?: File | null
   audio?: MemoryAudio
   audioFile?: File | null
 }
@@ -23,6 +24,7 @@ interface OfflineMemory {
   createdAt: string
   relatoDoDia: string
   photos: MemoryPhoto[]
+  video?: MemoryVideo
   audio?: MemoryAudio
   timestamp: number
 }
@@ -73,6 +75,14 @@ export async function publishMemory(
     onProgress?.(Math.round(10 + ((i + 1) / normalizedFiles.length) * 40))
   }
 
+  // Process video if present
+  let video: MemoryVideo | undefined
+  if (input.videoFile) {
+    onProgress?.(55)
+    const base64 = await blobToBase64(input.videoFile)
+    video = { url: base64 }
+  }
+
   // Process audio if present
   let audio: MemoryAudio | undefined
   if (input.audioFile) {
@@ -101,6 +111,7 @@ export async function publishMemory(
     timestamp: new Date(input.happenedAt).getTime(),
     relatoDoDia: input.relatoDoDia,
     photos,
+    video,
     audio,
   }
 
@@ -121,6 +132,7 @@ export async function publishMemory(
     createdAt: offlineMemory.createdAt,
     relatoDoDia: offlineMemory.relatoDoDia,
     photos: offlineMemory.photos,
+    video: offlineMemory.video,
     audio: offlineMemory.audio,
   }
 }
@@ -157,6 +169,14 @@ export async function updateMemory(
     }
   }
 
+  // Process new video if provided
+  let video = memories[index].video
+  if (input.videoFile) {
+    onProgress?.(55)
+    const base64 = await blobToBase64(input.videoFile)
+    video = { url: base64 }
+  }
+
   // Process new audio if provided
   let audio = memories[index].audio
   if (input.audioFile) {
@@ -184,6 +204,7 @@ export async function updateMemory(
     timestamp: new Date(input.happenedAt).getTime(),
     relatoDoDia: input.relatoDoDia,
     photos,
+    video,
     audio,
   }
 
@@ -201,6 +222,7 @@ export async function updateMemory(
     createdAt: updated.createdAt,
     relatoDoDia: updated.relatoDoDia,
     photos: updated.photos,
+    video: updated.video,
     audio: updated.audio,
   }
 }
@@ -223,6 +245,7 @@ export async function getAllMemories(): Promise<MemoryEntry[]> {
       createdAt: m.createdAt,
       relatoDoDia: m.relatoDoDia,
       photos: m.photos,
+      video: m.video,
       audio: m.audio,
     }))
 }

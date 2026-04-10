@@ -88,6 +88,14 @@ function Mp3Player({ url }: { url: string }) {
   )
 }
 
+function ShortVideoPlayer({ url }: { url: string }) {
+  return (
+    <div className="overflow-hidden rounded-3xl bg-stone-950/90 shadow-soft ring-1 ring-white/10">
+      <video controls className="h-full w-full" src={url} preload="metadata" playsInline />
+    </div>
+  )
+}
+
 export function TimelineCard({ entry }: TimelineCardProps) {
   const [activePhoto, setActivePhoto] = useState<MemoryPhoto | null>(null)
   const [photoDirection, setPhotoDirection] = useState<1 | -1>(1)
@@ -217,6 +225,8 @@ export function TimelineCard({ entry }: TimelineCardProps) {
             }}
           />
 
+          {entry.video ? <ShortVideoPlayer url={entry.video.url} /> : null}
+
           {entry.audio?.kind === 'spotify' ? <SpotifyEmbed url={entry.audio.url} /> : null}
           {entry.audio?.kind === 'mp3' ? <Mp3Player url={entry.audio.url} /> : null}
         </div>
@@ -294,9 +304,10 @@ export function TimelineCard({ entry }: TimelineCardProps) {
             </div>
 
             <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
+              {entry.video ? <ShortVideoPlayer url={entry.video.url} /> : null}
               {entry.audio?.kind === 'spotify' ? <SpotifyEmbed url={entry.audio.url} /> : null}
               {entry.audio?.kind === 'mp3' ? <Mp3Player url={entry.audio.url} /> : null}
-              {!entry.audio ? <p className="text-sm text-stone-200">Sem música associada a esta memória.</p> : null}
+              {!entry.audio && !entry.video ? <p className="text-sm text-stone-200">Sem mídia adicional associada a esta memória.</p> : null}
             </div>
           </div>
         </div>

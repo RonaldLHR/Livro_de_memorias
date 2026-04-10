@@ -79,9 +79,11 @@ export function AdminPanel({
     author: 'Ronald' as 'Ronald' | 'Suellen',
   })
   const [photos, setPhotos] = useState<File[]>([])
+  const [videoFile, setVideoFile] = useState<File | null>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([])
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null)
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null)
 
   const statusLabel = useMemo(
@@ -101,6 +103,20 @@ export function AdminPanel({
   }, [photos])
 
   useEffect(() => {
+    if (!videoFile) {
+      setVideoPreviewUrl(null)
+      return
+    }
+
+    const url = URL.createObjectURL(videoFile)
+    setVideoPreviewUrl(url)
+
+    return () => {
+      URL.revokeObjectURL(url)
+    }
+  }, [videoFile])
+
+  useEffect(() => {
     if (!audioFile) {
       setAudioPreviewUrl(null)
       return
@@ -117,6 +133,7 @@ export function AdminPanel({
   function resetForm() {
     setFormState({ title: '', happenedAt: '', relatoDoDia: '', spotifyUrl: '', author: 'Ronald' })
     setPhotos([])
+    setVideoFile(null)
     setAudioFile(null)
     setEditingId(null)
   }
@@ -131,6 +148,7 @@ export function AdminPanel({
       author: memory.author,
     })
     setPhotos([])
+    setVideoFile(null)
     setAudioFile(null)
   }
 
@@ -165,6 +183,7 @@ export function AdminPanel({
       relatoDoDia: formState.relatoDoDia,
       author: formState.author,
       photos,
+      videoFile,
       audioFile,
       audio: audioFile
         ? { kind: 'mp3', url: audioFile.name }
@@ -323,6 +342,23 @@ export function AdminPanel({
             ) : null}
           </label>
         </div>
+
+        <label className="grid gap-2">
+          <span className="flex items-center gap-2 text-sm font-medium text-stone-700">
+            <Upload size={16} />
+            Vídeo curto (opcional)
+          </span>
+          <input
+            type="file"
+            accept="video/mp4,video/webm,video/quicktime"
+            onChange={(event: ChangeEvent<HTMLInputElement>) => setVideoFile(event.target.files?.[0] ?? null)}
+            className="rounded-2xl border border-dashed border-stone-300 bg-white px-4 py-3 text-sm text-stone-500 file:mr-4 file:rounded-full file:border-0 file:bg-blush-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blush-700 hover:border-blush-500"
+          />
+
+          <p className="text-xs text-stone-500">Sugestão: até 15-30s para manter carregamento rápido e visual elegante.</p>
+          {videoFile ? <p className="text-xs text-stone-500">Vídeo selecionado: {videoFile.name}</p> : null}
+          {videoPreviewUrl ? <video controls className="w-full rounded-2xl ring-1 ring-black/10" src={videoPreviewUrl} preload="metadata" /> : null}
+        </label>
 
         <label className="grid gap-2">
           <span className="flex items-center gap-2 text-sm font-medium text-stone-700">

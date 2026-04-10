@@ -9,6 +9,10 @@ export type MemoryAudio = {
   url: string
 }
 
+export type MemoryVideo = {
+  url: string
+}
+
 export type MemoryEntry = {
   id: string
   title: string
@@ -16,6 +20,7 @@ export type MemoryEntry = {
   createdAt: string
   relatoDoDia: string
   photos: MemoryPhoto[]
+  video?: MemoryVideo
   audio?: MemoryAudio
   author: 'Ronald' | 'Suellen'
 }

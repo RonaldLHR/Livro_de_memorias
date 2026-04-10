@@ -1,7 +1,7 @@
 import { collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage, firebaseAvailable } from './firebase'
-import type { MemoryAudio, MemoryEntry, MemoryPhoto } from '../types'
+import type { MemoryAudio, MemoryEntry, MemoryPhoto, MemoryVideo } from '../types'
 import { normalizeImageFiles } from './imageNormalization'
 
 export type MemoryFormInput = {
@@ -10,6 +10,7 @@ export type MemoryFormInput = {
   relatoDoDia: string
   author: 'Ronald' | 'Suellen'
   photos: File[]
+  videoFile?: File | null
   audio?: MemoryAudio
   audioFile?: File | null
 }
@@ -98,6 +99,23 @@ async function uploadAudio(memoryId: string, file: File, onProgress?: UploadProg
   return url
 }
 
+async function uploadVideo(memoryId: string, file: File, onProgress?: UploadProgressCallback) {
+  const activeStorage = storage
+
+  if (!activeStorage) {
+    return ''
+  }
+
+  const extension = file.name.split('.').pop()?.toLowerCase() || 'mp4'
+  const fileRef = ref(activeStorage, `memories/${memoryId}/video-${Date.now()}.${extension}`)
+
+  await withTimeout(uploadBytes(fileRef, file), 90000, 'Tempo esgotado no upload do vídeo.')
+  onProgress?.(100)
+  const url = await withTimeout(getDownloadURL(fileRef), 30000, 'Tempo esgotado ao gerar URL do vídeo.')
+
+  return url
+}
+
 export async function publishMemory(input: PublishMemoryInput, onUploadProgress?: UploadProgressCallback) {
   if (!firebaseAvailable || !db) {
     throw new Error('Firebase não está configurado neste ambiente.')
@@ -106,22 +124,33 @@ export async function publishMemory(input: PublishMemoryInput, onUploadProgress?
   const memoryRef = doc(collection(db, 'memories'))
 
   const hasAudioUpload = Boolean(input.audioFile)
-  const photoWeight = hasAudioUpload ? 0.8 : 1
+  const hasVideoUpload = Boolean(input.videoFile)
+  const photoWeight = hasVideoUpload ? 0.55 : hasAudioUpload ? 0.75 : 1
+  const videoWeight = hasVideoUpload ? 0.25 : 0
   const audioWeight = hasAudioUpload ? 0.2 : 0
 
   let photoProgress = 0
+  let videoProgress = hasVideoUpload ? 0 : 100
   let audioProgress = 0
 
   const emitCombinedProgress = () => {
-    const total = (photoProgress * photoWeight + audioProgress * audioWeight) / (photoWeight + audioWeight || 1)
+    const total =
+      (photoProgress * photoWeight + videoProgress * videoWeight + audioProgress * audioWeight) /
+      (photoWeight + videoWeight + audioWeight || 1)
     onUploadProgress?.(Math.round(total))
   }
 
-  const [photos, uploadedAudioUrl] = await Promise.all([
+  const [photos, uploadedVideoUrl, uploadedAudioUrl] = await Promise.all([
     uploadPhotos(memoryRef.id, input.photos, (progress) => {
       photoProgress = progress
       emitCombinedProgress()
     }),
+    input.videoFile
+      ? uploadVideo(memoryRef.id, input.videoFile, (progress) => {
+          videoProgress = progress
+          emitCombinedProgress()
+        })
+      : Promise.resolve<string | null>(null),
     input.audioFile
       ? uploadAudio(memoryRef.id, input.audioFile, (progress) => {
           audioProgress = progress
@@ -129,6 +158,10 @@ export async function publishMemory(input: PublishMemoryInput, onUploadProgress?
         })
       : Promise.resolve<string | null>(null),
   ])
+
+  const video = input.videoFile
+    ? ({ url: uploadedVideoUrl ?? '' } satisfies MemoryVideo)
+    : undefined
 
   const audio = input.audioFile
     ? ({ kind: 'mp3', url: uploadedAudioUrl ?? '' } satisfies MemoryAudio)
@@ -142,6 +175,7 @@ export async function publishMemory(input: PublishMemoryInput, onUploadProgress?
     author: input.author,
     createdAt: serverTimestamp(),
     photos,
+    video: video ?? null,
     audio: audio ?? null,
     }),
     30000,
@@ -158,6 +192,7 @@ export async function publishMemory(input: PublishMemoryInput, onUploadProgress?
     author: input.author,
     createdAt: new Date().toISOString(),
     audio,
+    video,
     photos,
   } satisfies MemoryEntry
 }
@@ -173,12 +208,15 @@ export async function updateMemory(
   }
 
   const hasPhotoUpload = input.photos.length > 0
+  const hasVideoUpload = Boolean(input.videoFile)
   const hasAudioUpload = Boolean(input.audioFile)
-  const weightTotal = (hasPhotoUpload ? 0.8 : 0) + (hasAudioUpload ? 0.2 : 0)
-  const photoWeight = hasPhotoUpload ? 0.8 : 0
+  const photoWeight = hasPhotoUpload ? (hasVideoUpload ? 0.55 : hasAudioUpload ? 0.75 : 1) : 0
+  const videoWeight = hasVideoUpload ? 0.25 : 0
   const audioWeight = hasAudioUpload ? 0.2 : 0
+  const weightTotal = photoWeight + videoWeight + audioWeight
 
   let photoProgress = hasPhotoUpload ? 0 : 100
+  let videoProgress = hasVideoUpload ? 0 : 100
   let audioProgress = hasAudioUpload ? 0 : 100
 
   const emitCombinedProgress = () => {
@@ -187,17 +225,23 @@ export async function updateMemory(
       return
     }
 
-    const total = (photoProgress * photoWeight + audioProgress * audioWeight) / weightTotal
+    const total = (photoProgress * photoWeight + videoProgress * videoWeight + audioProgress * audioWeight) / weightTotal
     onUploadProgress?.(Math.round(total))
   }
 
-  const [uploadedPhotos, uploadedAudioUrl] = await Promise.all([
+  const [uploadedPhotos, uploadedVideoUrl, uploadedAudioUrl] = await Promise.all([
     input.photos.length > 0
       ? uploadPhotos(memoryId, input.photos, (progress) => {
           photoProgress = progress
           emitCombinedProgress()
         })
       : Promise.resolve<MemoryPhoto[]>(previous.photos),
+    input.videoFile
+      ? uploadVideo(memoryId, input.videoFile, (progress) => {
+          videoProgress = progress
+          emitCombinedProgress()
+        })
+      : Promise.resolve<string | null>(null),
     input.audioFile
       ? uploadAudio(memoryId, input.audioFile, (progress) => {
           audioProgress = progress
@@ -205,6 +249,10 @@ export async function updateMemory(
         })
       : Promise.resolve<string | null>(null),
   ])
+
+  const video = input.videoFile
+    ? ({ url: uploadedVideoUrl ?? '' } satisfies MemoryVideo)
+    : previous.video ?? undefined
 
   const audio = input.audioFile
     ? ({ kind: 'mp3', url: uploadedAudioUrl ?? '' } satisfies MemoryAudio)
@@ -217,6 +265,7 @@ export async function updateMemory(
       relatoDoDia: input.relatoDoDia,
       author: input.author,
       photos: uploadedPhotos,
+      video: video ?? null,
       audio: audio ?? null,
     }),
     30000,
@@ -233,6 +282,7 @@ export async function updateMemory(
     relatoDoDia: input.relatoDoDia,
     author: input.author,
     photos: uploadedPhotos,
+    video,
     audio,
   } satisfies MemoryEntry
 }
@@ -271,6 +321,7 @@ export async function loadMemories() {
       createdAt,
       relatoDoDia: data.relatoDoDia,
       photos: data.photos ?? [],
+      video: data.video ?? undefined,
       audio: data.audio ?? undefined,
       author: data.author,
     } satisfies MemoryEntry
